@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f0c1b">
+  <title>Health Buddy</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; touch-action: manipulation; }
+    
+    #scenic-bg {
+      transition: background-image 0.8s ease-in-out;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .fuji-glass {
+      background: rgba(18, 14, 34, 0.82);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(244, 114, 182, 0.28);
+      box-shadow: 0 8px 32px 0 rgba(10, 8, 25, 0.5);
+    }
+    .fuji-glass-subtle {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .fuji-btn {
+      background: linear-gradient(135deg, rgba(244, 114, 182, 0.25), rgba(168, 85, 247, 0.2));
+      border: 1px solid rgba(244, 114, 182, 0.35);
+      backdrop-filter: blur(12px);
+    }
+
+    .pulse-dot { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.3); } }
+
+    #window-slider {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(244, 114, 182, 0.3); border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-950 min-h-screen flex items-center justify-center p-2 select-none text-white">
+
+  <!-- Mobile Frame Container -->
+  <div id="mobile-viewport" class="w-full max-w-sm rounded-[42px] shadow-2xl overflow-hidden border border-pink-300/30 relative h-[870px] bg-slate-950">
+    
+    <!-- Dynamic Landscape Wallpaper Layer with Offline Fallback -->
+    <div id="scenic-bg" class="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950" 
+         style="background-image: url('https://images.unsplash.com/photo-1570459027562-4a916cc6113f?q=80&w=1200&auto=format&fit=crop');">
+      <div class="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-purple-950/25 to-slate-950/70"></div>
+    </div>
+
+    <!-- Hidden Wallpaper Upload -->
+    <input type="file" id="gallery-input" accept="image/*" class="hidden" onchange="loadCustomWallpaper(event)">
+
+    <!-- ==================== POCKET WALK MODE OVERLAY (Keeps Sensor Alive in Pocket) ==================== -->
+    <div id="pocket-overlay" class="hidden absolute inset-0 z-50 bg-black/95 flex flex-col items-center justify-between p-8 text-center animate-fadeIn">
+      <div class="space-y-1 pt-6">
+        <div class="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+          <span>POCKET WALK ACTIVE</span>
+        </div>
+        <p class="text-[10px] text-white/50">Display dimmed to save battery. Screen won't lock.</p>
+      </div>
+
+      <div class="space-y-2">
+        <div id="pocket-steps-display" class="text-6xl font-extrabold text-white tracking-tight">0</div>
+        <div class="text-xs font-semibold text-purple-300">Steps Counted</div>
+      </div>
+
+      <div class="space-y-2 w-full pb-6">
+        <button onclick="exitPocketMode()" class="w-full py-3 rounded-2xl bg-white/10 border border-white/20 text-xs font-bold text-pink-200 active:scale-95 shadow-lg">
+          Double-Tap to Exit Pocket Mode
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== HORIZONTAL 2-WINDOW SLIDER ==================== -->
+    <div id="window-slider" class="flex w-[200%] h-full">
+
+      <!-- ==================== WINDOW 1: MAIN DASHBOARD ==================== -->
+      <div class="w-1/2 h-full flex flex-col justify-between p-4 overflow-y-auto shrink-0">
+        
+        <!-- Top Bar -->
+        <div class="space-y-2 z-10">
+          <div class="flex items-center justify-between">
+            <div onclick="toggleRewardsModal()" class="flex items-center gap-1.5 fuji-glass px-2.5 py-1 rounded-2xl shadow-lg cursor-pointer active:scale-95 transition-all">
+              <div class="w-5 h-5 rounded-lg bg-gradient-to-tr from-pink-400 via-rose-400 to-indigo-500 flex items-center justify-center shadow-md">
+                <svg class="w-3 h-3 text-white fill-current" viewBox="0 0 24 24"><path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2L7 10l-6 8h22L14 6z"/></svg>
+              </div>
+              <div>
+                <div class="text-[7px] font-bold text-pink-200/80 uppercase tracking-widest leading-none">Rank</div>
+                <div class="text-[11px] font-extrabold text-white leading-none">Lvl <span id="level-display">1</span>/30</div>
+              </div>
+            </div>
+
+            <!-- 2026 Streak Badge -->
+            <button onclick="toggleCalendarModal()" class="fuji-glass px-2.5 py-1 rounded-2xl flex items-center gap-1.5 shadow-md border border-orange-400/40 active:scale-95 transition-all">
+              <svg class="w-3.5 h-3.5 fill-current text-orange-400 animate-pulse" viewBox="0 0 24 24"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM12 20c-3.31 0-6-2.69-6-6 0-1.53.5-3 1.36-4.14 1.25 1.7 3.23 2.81 5.48 2.81.4 0 .78-.04 1.16-.11A5.992 5.992 0 0118 14c0 3.31-2.69 6-6 6z"/></svg>
+              <div class="text-left">
+                <div class="text-[7px] font-bold text-orange-300 uppercase tracking-widest leading-none">Streak</div>
+                <div class="text-[11px] font-extrabold text-white leading-none"><span id="streak-display">0</span> Days</div>
+              </div>
+            </button>
+
+            <!-- Top Actions -->
+            <div class="flex items-center gap-1">
+              <!-- Pocket Walk Mode Button -->
+              <button onclick="enterPocketMode()" title="Walk with Screen in Pocket" class="fuji-glass-subtle px-2 py-1 rounded-xl text-[10px] font-bold text-emerald-300 hover:text-white transition-all shadow-md flex items-center gap-1 border border-emerald-400/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
+                <span>Walk Mode</span>
+              </button>
+              <button onclick="toggleCalendarModal()" class="fuji-glass-subtle p-1.5 rounded-xl text-pink-200 hover:text-white transition-all shadow-md">
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+              </button>
+              <button onclick="toggleGoalsModal()" class="fuji-glass-subtle p-1.5 rounded-xl text-pink-200 hover:text-white transition-all shadow-md">
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93z"/></svg>
+              </button>
+              <button onclick="toggleRewardsModal()" class="fuji-glass-subtle p-1.5 rounded-xl text-amber-300 hover:text-white transition-all shadow-md">
+                <svg class="w-3.5 h-3.5 fill-current text-amber-400" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>
+              </button>
+              <button onclick="toggleThemeDrawer()" class="fuji-glass-subtle p-1.5 rounded-xl transition-all shadow-md">
+                <svg class="w-3.5 h-3.5 fill-current text-pink-200" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 19.6 10.57 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Date Bar & Quests Switcher -->
+          <div class="flex items-center gap-1.5">
+            <div class="flex-1 fuji-glass px-2.5 py-1 rounded-2xl flex items-center justify-between text-xs border border-pink-400/30">
+              <button onclick="changeActiveDay(-1)" class="w-6 h-6 rounded-lg fuji-glass-subtle flex items-center justify-center active:scale-90">
+                <svg class="w-3 h-3 fill-current text-pink-200" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+              </button>
+              <div class="flex items-center gap-1.5 cursor-pointer" onclick="toggleCalendarModal()">
+                <span id="active-date-display" class="font-extrabold text-white text-[11px] tracking-wide">Oct 22, 2026</span>
+                <span id="today-indicator-pill" class="text-[8px] bg-pink-500/30 text-pink-200 px-1.5 py-0.2 rounded-full uppercase font-bold">Today</span>
+              </div>
+              <button id="next-day-btn" onclick="changeActiveDay(1)" class="w-6 h-6 rounded-lg fuji-glass-subtle flex items-center justify-center active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed">
+                <svg class="w-3 h-3 fill-current text-pink-200" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+              </button>
+            </div>
+
+            <button onclick="slideWindow(1)" title="Slide to Quests" class="fuji-glass px-2.5 py-1 rounded-2xl flex items-center gap-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/30 active:scale-95 transition-all">
+              <span>Quests</span>
+              <svg class="w-3.5 h-3.5 fill-current text-emerald-400" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </button>
+          </div>
+
+          <!-- XP Bar -->
+          <div class="fuji-glass p-2 rounded-2xl flex items-center gap-2">
+            <span class="text-xs font-bold text-pink-300">XP</span>
+            <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+              <div id="xp-bar" class="bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 h-full w-[25%] transition-all duration-500 rounded-full shadow-lg shadow-pink-500/50"></div>
+            </div>
+            <span id="xp-display" class="text-[9px] font-semibold text-pink-200/90 tracking-tight whitespace-nowrap">25/120</span>
+          </div>
+
+          <!-- Scenic Theme Drawer -->
+          <div id="theme-drawer" class="hidden fuji-glass p-3 rounded-2xl border border-pink-400/30 animate-fadeIn relative space-y-2">
+            <div class="flex items-center justify-between pb-1 border-b border-white/10">
+              <span class="text-xs font-bold text-pink-200">Scenic Themes</span>
+              <button onclick="toggleThemeDrawer()" class="w-6 h-6 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center shadow">
+                <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="setTheme('fuji')" class="p-2 rounded-xl text-left text-xs font-bold bg-pink-500/20 border border-pink-300/40">Fuji Twilight</button>
+              <button onclick="setTheme('alpine')" class="p-2 rounded-xl text-left text-xs font-bold bg-cyan-500/20 border border-cyan-300/40">Alpine Mist</button>
+              <button onclick="setTheme('golden')" class="p-2 rounded-xl text-left text-xs font-bold bg-amber-500/20 border border-amber-300/40">Golden Ridge</button>
+              <button onclick="setTheme('aurora')" class="p-2 rounded-xl text-left text-xs font-bold bg-emerald-500/20 border border-emerald-300/40">Aurora Lake</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Cards (Water, Steps, Weight) -->
+        <div class="space-y-3 my-auto z-10 py-1">
+          <!-- Status Banner -->
+          <div class="fuji-glass px-3 py-1.5 rounded-2xl text-center shadow-lg border border-pink-300/30 flex items-center justify-between">
+            <p id="subtitles" class="text-xs font-medium text-pink-50/95 leading-relaxed truncate">
+              "App is offline ready. Data saves directly on your phone."
+            </p>
+            <span class="text-[9px] text-emerald-300 font-bold shrink-0 ml-1">Swipe ◀</span>
+          </div>
+
+          <!-- 1. Water Card -->
+          <div class="fuji-glass p-3.5 rounded-3xl shadow-xl space-y-1.5 border border-blue-400/30">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center">
+                  <svg class="w-4 h-4 fill-current text-blue-400" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
+                </div>
+                <div>
+                  <div class="text-[9px] font-extrabold uppercase tracking-widest text-blue-200/80">Hydration Progress</div>
+                  <div class="text-xs font-bold text-white">Daily Water Intake</div>
+                </div>
+              </div>
+              <button onclick="editWaterGoal()" class="fuji-glass-subtle px-2 py-0.5 rounded-lg text-[10px] text-pink-200 hover:text-white">Set Goal</button>
+            </div>
+            <div class="flex items-baseline justify-between pt-0.5">
+              <div><span id="water-current-val" class="text-2xl font-extrabold text-white">0</span><span class="text-xs font-semibold text-blue-200/70"> ml logged</span></div>
+              <div class="text-xs font-bold text-pink-200/70">Target: <span id="water-goal-display">2000</span> ml</div>
+            </div>
+            <div class="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
+              <div id="water-bar" class="bg-gradient-to-r from-blue-400 via-pink-400 to-indigo-400 h-full w-[0%] transition-all duration-500 rounded-full"></div>
+            </div>
+            <div class="flex gap-2 pt-0.5">
+              <button id="add-water-btn" onclick="addWaterForActiveDay(250)" class="fuji-btn w-1/2 py-1.5 rounded-xl text-xs font-bold text-blue-100 active:scale-95 transition-all shadow-md">+ 250 ml</button>
+              <button onclick="addWaterForActiveDay(500)" class="fuji-btn w-1/2 py-1.5 rounded-xl text-xs font-bold text-pink-100 active:scale-95 transition-all shadow-md">+ 500 ml</button>
+            </div>
+          </div>
+
+          <!-- 2. Step Card -->
+          <div class="fuji-glass p-3.5 rounded-3xl shadow-xl space-y-1.5 border border-purple-400/30">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-400/40 flex items-center justify-center">
+                  <svg id="step-icon" class="w-4 h-4 fill-current text-purple-300 transition-transform" viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z"/></svg>
+                </div>
+                <div>
+                  <div class="text-[9px] font-extrabold uppercase tracking-widest text-purple-200/80">Movement Progress</div>
+                  <div class="text-xs font-bold text-white">Daily Steps Tracker</div>
+                </div>
+              </div>
+              <button onclick="editStepGoal()" class="fuji-glass-subtle px-2 py-0.5 rounded-lg text-[10px] text-pink-200 hover:text-white">Set Goal</button>
+            </div>
+            <div class="flex items-baseline justify-between pt-0.5">
+              <div><span id="steps-current-val" class="text-2xl font-extrabold text-white">0</span><span class="text-xs font-semibold text-purple-200/70"> steps</span></div>
+              <div class="text-xs font-bold text-purple-200/70">Target: <span id="steps-goal-display">7,000</span></div>
+            </div>
+            <div class="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
+              <div id="steps-bar" class="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400 h-full w-[0%] transition-all duration-300 rounded-full"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[10px] font-extrabold">
+              <div class="fuji-glass-subtle rounded-xl p-1 flex items-center justify-center gap-1.5 text-purple-200">
+                <svg class="w-3 h-3 fill-current text-purple-300" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                <span id="steps-km-display">0.00 km</span>
+              </div>
+              <div class="fuji-glass-subtle rounded-xl p-1 flex items-center justify-center gap-1.5 text-rose-300">
+                <svg class="w-3 h-3 fill-current text-rose-400" viewBox="0 0 24 24"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM12 20c-3.31 0-6-2.69-6-6 0-1.53.5-3 1.36-4.14 1.25 1.7 3.23 2.81 5.48 2.81.4 0 .78-.04 1.16-.11A5.992 5.992 0 0118 14c0 3.31-2.69 6-6 6z"/></svg>
+                <span id="steps-cal-display">0 kcal</span>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-0.5">
+              <button id="add-steps-btn" onclick="addStepsForActiveDay(1000)" class="fuji-btn w-1/2 py-1.5 rounded-xl text-xs font-bold text-purple-100 active:scale-95 transition-all shadow-md">+ 1,000 Steps</button>
+              <button id="sensor-btn" onclick="toggleStepSensor()" class="fuji-btn w-1/2 py-1.5 rounded-xl text-xs font-bold text-purple-100 active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5">
+                <span id="sensor-dot" class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+                <span id="sensor-btn-label">Sensor: ON</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Weight Card -->
+          <div class="fuji-glass p-3.5 rounded-3xl shadow-xl space-y-1.5 border border-pink-400/30">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-pink-500/20 border border-pink-400/40 flex items-center justify-center">
+                  <svg class="w-4 h-4 fill-current text-pink-300" viewBox="0 0 24 24"><path d="M12 3a9 9 0 00-9 9v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7a9 9 0 00-9-9zm0 4c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3z"/></svg>
+                </div>
+                <div>
+                  <div class="text-[9px] font-extrabold uppercase tracking-widest text-pink-200/80">Weight Harmony</div>
+                  <div class="text-xs font-bold text-white">Target Tracking</div>
+                </div>
+              </div>
+              <button onclick="promptUpdateWeight()" class="fuji-glass-subtle px-2 py-0.5 rounded-lg text-[10px] text-pink-200 hover:text-white">Update Weight</button>
+            </div>
+            <div class="flex items-baseline justify-between pt-0.5">
+              <div><span id="current-weight-display" class="text-2xl font-extrabold text-white">68.0</span><span class="text-xs font-semibold text-pink-200/70"> kg current</span></div>
+              <div class="text-xs font-bold text-pink-300">Ideal Target: <span id="ideal-weight-display">62.0</span> kg</div>
+            </div>
+            <div class="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
+              <div id="weight-bar" class="bg-gradient-to-r from-pink-400 via-rose-400 to-indigo-400 h-full w-[40%] transition-all duration-500 rounded-full"></div>
+            </div>
+            <div class="flex justify-between text-[10px] font-semibold text-pink-200/70">
+              <span id="weight-remaining-label">6.0 kg to ideal goal</span>
+              <span>Harmony Status</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Window Indicator Navigation Bar -->
+        <div class="z-10 pt-1">
+          <div class="fuji-glass py-1.5 px-3 rounded-2xl flex items-center justify-between text-[10px] font-semibold text-pink-200/80">
+            <span class="text-pink-300 font-bold">● Dashboard</span>
+            <button onclick="slideWindow(1)" class="text-emerald-300 font-bold flex items-center gap-1 active:scale-95 transition-all">
+              <span>Go to Quests</span>
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== WINDOW 2: CUSTOM TO-DO & DAILY QUESTS ==================== -->
+      <div class="w-1/2 h-full flex flex-col justify-between p-4 overflow-y-auto shrink-0 bg-slate-950/60 backdrop-blur-xl">
+        
+        <!-- Header -->
+        <div class="space-y-3 z-10">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <button onclick="slideWindow(0)" class="fuji-glass px-2.5 py-1 rounded-xl text-xs font-bold text-pink-200 hover:text-white flex items-center gap-1.5 active:scale-95 transition-all shadow-md">
+              <svg class="w-3.5 h-3.5 fill-current text-pink-300" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+              <span>Dashboard</span>
+            </button>
+
+            <div class="text-right">
+              <div class="text-[9px] uppercase font-extrabold text-emerald-300 tracking-widest">Habit Studio</div>
+              <div class="text-xs font-bold text-white">Daily Quests & To-Do</div>
+            </div>
+          </div>
+
+          <!-- Counter & Add Button -->
+          <div class="fuji-glass p-3 rounded-2xl flex items-center justify-between border border-emerald-400/30">
+            <div>
+              <div class="text-[9px] text-emerald-200/80 font-bold uppercase">Today's Progress</div>
+              <div id="quest-count-display" class="text-base font-extrabold text-white">0 / 0 Completed</div>
+            </div>
+            <button onclick="toggleAddTaskModal()" class="fuji-btn px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-100 flex items-center gap-1 active:scale-95 shadow-lg border border-emerald-400/40">
+              <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>+ Add Task</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Scrollable Quests List -->
+        <div class="my-auto z-10 py-3 space-y-2 overflow-y-auto max-h-[580px]">
+          <div id="todo-list-container" class="space-y-2"></div>
+        </div>
+
+        <!-- Window 2 Footer -->
+        <div class="z-10 pt-1">
+          <button onclick="slideWindow(0)" class="fuji-btn w-full py-2.5 rounded-2xl text-xs font-bold text-pink-100 flex items-center justify-center gap-2 shadow-lg">
+            <svg class="w-3.5 h-3.5 fill-current text-pink-300" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            <span>Back to Dashboard (Swipe Right)</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ==================== CELEBRATION LEVEL-UP MODAL WITH CONFETTI ==================== -->
+    <div id="levelup-modal" class="hidden absolute inset-2 z-50 fuji-glass rounded-3xl p-5 flex flex-col justify-between border-2 border-amber-300 shadow-2xl animate-fadeIn text-center overflow-hidden">
+      <canvas id="confetti-canvas" class="absolute inset-0 pointer-events-none z-10"></canvas>
+
+      <div class="flex justify-end z-20">
+        <button onclick="closeLevelUpModal()" class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-bold flex items-center justify-center shadow-lg border border-white/30 active:scale-95 transition-all">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="my-auto space-y-3 z-20">
+        <div class="relative w-20 h-20 mx-auto">
+          <div class="absolute inset-0 rounded-3xl bg-amber-400 blur-xl opacity-60 animate-pulse"></div>
+          <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 via-pink-500 to-purple-600 flex items-center justify-center shadow-2xl border-2 border-amber-200">
+            <svg class="w-10 h-10 fill-current text-white animate-bounce" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+        </div>
+
+        <div class="text-xs font-extrabold uppercase tracking-widest text-amber-300 animate-pulse">CELEBRATION MILESTONE</div>
+        <div class="text-3xl font-extrabold text-white tracking-tight">LEVEL <span id="popup-new-level">2</span>!</div>
+        <div id="popup-badge-name" class="text-base font-extrabold text-pink-200">Fresh Mist Wanderer</div>
+        <div id="popup-badge-desc" class="text-xs text-white/90 px-4 leading-relaxed">Milestone reward badge unlocked in your Vault!</div>
+      </div>
+
+      <button onclick="closeLevelUpModal()" class="fuji-btn w-full py-3 rounded-2xl text-xs font-bold text-amber-200 shadow-xl z-20 border border-amber-400/50 active:scale-95 transition-all">
+        Claim Reward & Continue
+      </button>
+    </div>
+
+    <!-- ==================== ADD TASK MODAL ==================== -->
+    <div id="add-task-modal" class="hidden absolute inset-4 z-50 fuji-glass rounded-3xl p-5 flex flex-col justify-between border-2 border-emerald-400/40 shadow-2xl animate-fadeIn">
+      <div class="space-y-4">
+        <div class="flex items-center justify-between border-b border-white/10 pb-2">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center">
+              <svg class="w-4 h-4 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <div>
+              <div class="text-xs font-extrabold text-white">Create Daily Quest</div>
+              <div class="text-[9px] text-emerald-300">Customize habit & reward XP</div>
+            </div>
+          </div>
+          <button onclick="toggleAddTaskModal()" class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-emerald-200 mb-1">Task or Habit Name:</label>
+            <input type="text" id="input-task-name" placeholder="e.g. Read 15 mins, Yoga, Vitamin..." class="w-full bg-black/40 border border-emerald-300/30 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-400">
+          </div>
+
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-pink-200 mb-1">Reward XP when completed:</label>
+            <select id="input-task-xp" class="w-full bg-slate-900 border border-pink-300/30 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-pink-400">
+              <option value="15">+15 XP (Quick Habit)</option>
+              <option value="25" selected>+25 XP (Standard Goal)</option>
+              <option value="40">+40 XP (High Effort Quest)</option>
+              <option value="50">+50 XP (Major Milestone)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-4">
+        <button onclick="toggleAddTaskModal()" class="fuji-btn w-1/2 py-2.5 rounded-xl text-xs font-bold text-pink-200 shadow-lg">Cancel</button>
+        <button onclick="saveNewTask()" class="fuji-btn w-1/2 py-2.5 rounded-xl text-xs font-bold text-emerald-200 shadow-lg border-emerald-400/40">Save Task</button>
+      </div>
+    </div>
+
+    <!-- ==================== ACHIEVEMENTS VAULT ==================== -->
+    <div id="rewards-modal" class="hidden absolute inset-2 z-50 fuji-glass rounded-3xl flex flex-col justify-between border-2 border-pink-400/40 shadow-2xl animate-fadeIn overflow-hidden">
+      <div class="sticky top-0 bg-slate-900/95 backdrop-blur-md px-4 py-3 border-b border-white/10 z-20 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 fill-current text-amber-400" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2z"/></svg>
+          <div>
+            <div class="text-xs font-extrabold text-white">Achievements & Vault</div>
+            <div class="text-[9px] text-pink-300">All 30 Levels (Done & Remaining)</div>
+          </div>
+        </div>
+        <button onclick="toggleRewardsModal()" class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-lg border border-white/30 active:scale-95 transition-all">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="flex gap-1.5 px-4 pt-2.5 pb-1 text-[10px] font-bold">
+        <button onclick="filterAchievements('all')" id="tab-all" class="px-2.5 py-1 rounded-lg bg-pink-500/30 text-white border border-pink-400/30">All (30)</button>
+        <button onclick="filterAchievements('done')" id="tab-done" class="px-2.5 py-1 rounded-lg fuji-glass-subtle text-pink-200">Unlocked</button>
+        <button onclick="filterAchievements('left')" id="tab-left" class="px-2.5 py-1 rounded-lg fuji-glass-subtle text-pink-200">Remaining</button>
+      </div>
+
+      <div id="achievements-list" class="p-4 space-y-2 overflow-y-auto max-h-[550px] text-xs"></div>
+
+      <div class="p-3 border-t border-white/10 bg-slate-900/90 flex gap-2">
+        <button onclick="toggleRewardsModal()" class="fuji-btn w-full py-2 rounded-xl text-xs font-bold text-pink-100 shadow-lg">Close Window</button>
+      </div>
+    </div>
+
+    <!-- ==================== 2026 CALENDAR MODAL ==================== -->
+    <div id="calendar-modal" class="hidden absolute inset-2 z-50 fuji-glass rounded-3xl flex flex-col justify-between border-2 border-pink-400/40 shadow-2xl animate-fadeIn overflow-hidden">
+      <div class="sticky top-0 bg-slate-900/95 backdrop-blur-md px-4 py-3 border-b border-white/10 z-20 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 fill-current text-pink-400" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+          <div>
+            <div class="text-xs font-extrabold text-white">2026 Streak & Timeline</div>
+            <div class="text-[9px] text-pink-300">Past days only (Future locked)</div>
+          </div>
+        </div>
+        <button onclick="toggleCalendarModal()" class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-lg border border-white/30 active:scale-95 transition-all">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3">
+        <div class="flex items-center justify-between px-2 text-xs font-bold">
+          <button onclick="changeCalendarMonth(-1)" class="w-8 h-8 rounded-xl fuji-glass-subtle flex items-center justify-center active:scale-90 text-pink-200">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+          </button>
+          <span id="calendar-month-label" class="text-pink-200 text-sm font-extrabold tracking-wide">October 2026</span>
+          <button onclick="changeCalendarMonth(1)" class="w-8 h-8 rounded-xl fuji-glass-subtle flex items-center justify-center active:scale-90 text-pink-200">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-pink-300/70">
+          <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div>
+        </div>
+
+        <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center text-xs font-bold max-h-56 overflow-y-auto"></div>
+
+        <div class="flex items-center justify-around text-[9px] text-pink-200/80 pt-1 border-t border-white/10">
+          <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-pink-400"></span> Goal Met</div>
+          <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-white/10"></span> Past Log</div>
+          <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-700/50"></span> Future (Locked)</div>
+        </div>
+      </div>
+
+      <div class="p-3 border-t border-white/10 bg-slate-900/90 flex gap-2">
+        <button onclick="jumpToRealToday(); toggleCalendarModal();" class="fuji-btn w-1/2 py-2 rounded-xl text-xs font-bold text-pink-100 shadow-lg">Jump to Today</button>
+        <button onclick="toggleCalendarModal()" class="fuji-btn w-1/2 py-2 rounded-xl text-xs font-bold text-pink-100 shadow-lg">Close Window</button>
+      </div>
+    </div>
+
+    <!-- ==================== GOALS MODAL ==================== -->
+    <div id="goals-modal" class="hidden absolute inset-2 z-50 fuji-glass rounded-3xl flex flex-col justify-between border-2 border-pink-400/40 shadow-2xl animate-fadeIn overflow-hidden">
+      <div class="sticky top-0 bg-slate-900/95 backdrop-blur-md px-4 py-3 border-b border-white/10 z-20 flex items-center justify-between">
+        <div class="text-xs font-extrabold text-white">Adjust Targets & Goals</div>
+        <button onclick="toggleGoalsModal()" class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-lg border border-white/30 active:scale-95 transition-all">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3 text-xs overflow-y-auto">
+        <div>
+          <label class="block text-[10px] uppercase font-bold text-pink-200 mb-1">Daily Water Goal (ml):</label>
+          <input type="number" id="input-water-goal" step="250" class="w-full bg-black/40 border border-pink-300/30 rounded-xl px-3 py-2 text-white font-bold">
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase font-bold text-purple-200 mb-1">Daily Steps Goal:</label>
+          <input type="number" id="input-step-goal" step="500" class="w-full bg-black/40 border border-purple-300/30 rounded-xl px-3 py-2 text-white font-bold">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-pink-200 mb-1">Current Weight (kg):</label>
+            <input type="number" id="input-current-weight" step="0.5" class="w-full bg-black/40 border border-pink-300/30 rounded-xl px-3 py-2 text-white font-bold">
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-pink-200 mb-1">Ideal Weight (kg):</label>
+            <input type="number" id="input-ideal-weight" step="0.5" class="w-full bg-black/40 border border-pink-300/30 rounded-xl px-3 py-2 text-white font-bold">
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 border-t border-white/10 bg-slate-900/90 flex gap-2">
+        <button onclick="toggleGoalsModal()" class="fuji-btn w-1/2 py-2 rounded-xl text-xs font-bold text-pink-200 shadow-lg">Cancel</button>
+        <button onclick="saveCustomGoals()" class="fuji-btn w-1/2 py-2 rounded-xl text-xs font-bold text-pink-100 shadow-lg">Save Targets</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ================= POCKET WALK MODE & WAKE LOCK API =================
+    let wakeLockSentinel = null;
+
+    async function enterPocketMode() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log('WakeLock not supported or allowed:', err);
+      }
+      document.getElementById('pocket-overlay').classList.remove('hidden');
+      document.getElementById('pocket-steps-display').innerText = getLog(realTodayStr).steps.toLocaleString();
+    }
+
+    function exitPocketMode() {
+      if (wakeLockSentinel !== null) {
+        wakeLockSentinel.release().then(() => { wakeLockSentinel = null; });
+      }
+      document.getElementById('pocket-overlay').classList.add('hidden');
+    }
+
+    // ================= SERVICE WORKER REGISTRATION (OFFLINE PWA) =================
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.log('SW registration failed:', err);
+        });
+      });
+    }
+
+    // ================= WEB AUDIO API (OFFLINE SOUND ENGINE) =================
+    let audioCtx;
+    function getAudioContext() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playClickSound() {
+      try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(750, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(320, ctx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.04);
+      } catch(e) {}
+    }
+
+    function playLevelUpSound() {
+      try {
+        const ctx = getAudioContext();
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          const startTime = ctx.currentTime + idx * 0.11;
+          osc.frequency.setValueAtTime(freq, startTime);
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(0.28, startTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.42);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + 0.42);
+        });
+      } catch(e) {}
+    }
+
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('button') || e.target.closest('[role="button"]') || e.target.closest('.cursor-pointer')) {
+        playClickSound();
+      }
+    });
+
+    // ================= STATE & 2026 TIMELINE =================
+    const realToday = new Date();
+    const realTodayStr = formatDateKey(realToday);
+
+    let activeDateStr = localStorage.getItem('hb_active_date') || realTodayStr;
+    if (activeDateStr > realTodayStr) activeDateStr = realTodayStr;
+    let calendarMonthDate = new Date(activeDateStr);
+
+    let timelineLogs = JSON.parse(localStorage.getItem('hb_timeline_logs_2026')) || {};
+
+    let customTasks = JSON.parse(localStorage.getItem('hb_custom_tasks')) || [
+      { id: 'task_1', title: 'Morning Fresh Air & 10m Stroll', xp: 25 },
+      { id: 'task_2', title: 'Gentle Posture & Mindful Breathing', xp: 20 },
+      { id: 'task_3', title: 'Drink 1 Glass Warm Herbal Tea', xp: 15 }
+    ];
+
+    let xp = parseInt(localStorage.getItem('hb_xp')) || 25;
+    let level = parseInt(localStorage.getItem('hb_level')) || 1;
+    let waterGoal = parseInt(localStorage.getItem('hb_water_goal')) || 2000;
+    let stepGoal = parseInt(localStorage.getItem('hb_steps_goal')) || 7000;
+    let currentWeight = parseFloat(localStorage.getItem('hb_current_weight')) || 68.0;
+    let idealWeight = parseFloat(localStorage.getItem('hb_ideal_weight')) || 62.0;
+
+    let customBg = localStorage.getItem('hb_custom_bg');
+    let isSensorActive = localStorage.getItem('hb_sensor_active') !== 'false';
+
+    let lastStepTime = 0;
+    let lastAccMagnitude = 0;
+    const STEP_THRESHOLD = 11.8;
+    const STEP_COOLDOWN = 320;
+
+    const LEVEL_ROSTER = [
+      { lvl: 1, name: "Alpine Novice", reward: "Base Wanderer Badge" },
+      { lvl: 2, name: "Fresh Mist", reward: "Alpine Mist Badge" },
+      { lvl: 3, name: "Crystal Spring", reward: "Golden Water Shimmer" },
+      { lvl: 4, name: "Trail Scout", reward: "Scout Crest Token" },
+      { lvl: 5, name: "Mountain Walker", reward: "Fuji Footsteps Badge" },
+      { lvl: 6, name: "Pine Whisperer", reward: "Pine Forest Emblem" },
+      { lvl: 7, name: "Dawn Strider", reward: "Sunburst Morning Badge" },
+      { lvl: 8, name: "Golden Ember", reward: "Golden Aura Profile Token" },
+      { lvl: 9, name: "Altitude Climber", reward: "High Elevation Crest" },
+      { lvl: 10, name: "Stone Guardian", reward: "Endurance Stone Badge" },
+      { lvl: 11, name: "Twilight Seeker", reward: "Dusk Violet Card Tint" },
+      { lvl: 12, name: "Waterfall Sprinter", reward: "Hydration Streak Booster" },
+      { lvl: 13, name: "Frost Runner", reward: "Glacier Ice Badge" },
+      { lvl: 14, name: "Cloud Surfer", reward: "Cloudcrest Token" },
+      { lvl: 15, name: "Highland Sentinel", reward: "Highlander Silver Trophy" },
+      { lvl: 16, name: "Zen Harmonizer", reward: "Harmonizer Crest" },
+      { lvl: 17, name: "Storm Strider", reward: "Lightning Pace Emblem" },
+      { lvl: 18, name: "Bamboo Master", reward: "Zen Green Ambient Tint" },
+      { lvl: 19, name: "Sunburst Climber", reward: "Radiant Gold Badge" },
+      { lvl: 20, name: "Summit Conqueror", reward: "Summit Gold Trophy" },
+      { lvl: 21, name: "Mist Weaver", reward: "Aurora Lake Glow Effect" },
+      { lvl: 22, name: "Iron Will", reward: "Unbreakable Will Crest" },
+      { lvl: 23, name: "Starlight Voyager", reward: "Midnight Celestial Badge" },
+      { lvl: 24, name: "Glacier Monarch", reward: "Ice Monarch Emblem" },
+      { lvl: 25, name: "Dragon's Ascent", reward: "Dragon Breath Aura" },
+      { lvl: 26, name: "Celestial Nomad", reward: "Celestial Star Token" },
+      { lvl: 27, name: "Timeless Spirit", reward: "Eternal Clock Emblem" },
+      { lvl: 28, name: "Fuji Sovereign", reward: "Highlander Sovereign Badge" },
+      { lvl: 29, name: "Ascended Legend", reward: "Ascended Radiant Crest" },
+      { lvl: 30, name: "Master of Eternity", reward: "Mythic Fuji Gold Crown & Supreme Title" }
+    ];
+
+    function getRequiredXP(lvl) {
+      return Math.round(100 + (lvl - 1) * 85 + Math.pow(lvl, 1.45) * 12);
+    }
+
+    function formatDateKey(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    window.onload = function() {
+      updateUI();
+      setupSwipeGestures();
+      if (customBg) document.getElementById("scenic-bg").style.backgroundImage = `url('${customBg}')`;
+      if (isSensorActive) initSensor();
+      else updateSensorButtonUI(false);
+    };
+
+    // ================= ENHANCED SWIPE GESTURES =================
+    let currentWindowIndex = 0;
+
+    function slideWindow(index) {
+      currentWindowIndex = index;
+      document.getElementById("window-slider").style.transform = index === 1 ? "translateX(-50%)" : "translateX(0%)";
+    }
+
+    function setupSwipeGestures() {
+      const viewport = document.getElementById("mobile-viewport");
+      let startX = 0;
+      let startY = 0;
+
+      viewport.addEventListener('touchstart', function(e) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+
+      viewport.addEventListener('touchend', function(e) {
+        const diffX = startX - e.changedTouches[0].clientX;
+        const diffY = startY - e.changedTouches[0].clientY;
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 35) {
+          if (diffX > 0 && currentWindowIndex === 0) slideWindow(1);
+          else if (diffX < 0 && currentWindowIndex === 1) slideWindow(0);
+        }
+      }, { passive: true });
+    }
+
+    // ================= DATA LOGGING =================
+    function getLog(dateStr) {
+      if (!timelineLogs[dateStr]) timelineLogs[dateStr] = { water: 0, steps: 0, completedTasks: [] };
+      if (!timelineLogs[dateStr].completedTasks) timelineLogs[dateStr].completedTasks = [];
+      return timelineLogs[dateStr];
+    }
+
+    function saveLogs() {
+      localStorage.setItem('hb_timeline_logs_2026', JSON.stringify(timelineLogs));
+      localStorage.setItem('hb_custom_tasks', JSON.stringify(customTasks));
+      localStorage.setItem('hb_xp', xp);
+      localStorage.setItem('hb_level', level);
+      localStorage.setItem('hb_water_goal', waterGoal);
+      localStorage.setItem('hb_steps_goal', stepGoal);
+      localStorage.setItem('hb_current_weight', currentWeight);
+      localStorage.setItem('hb_ideal_weight', idealWeight);
+    }
+
+    function calculate2026Streak() {
+      let currentStreak = 0;
+      let checkDate = new Date(realToday);
+
+      while (checkDate.getFullYear() >= 2026) {
+        const key = formatDateKey(checkDate);
+        const log = timelineLogs[key];
+        const goalMet = log && (log.water >= waterGoal || log.steps >= stepGoal);
+        
+        if (key === realTodayStr && !goalMet) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          continue;
+        }
+
+        if (goalMet) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+      return currentStreak;
+    }
+
+    function updateUI() {
+      const log = getLog(activeDateStr);
+      const requiredXP = getRequiredXP(level);
+
+      document.getElementById("level-display").innerText = level;
+      document.getElementById("xp-bar").style.width = `${Math.min(100, (xp / requiredXP) * 100)}%`;
+      document.getElementById("xp-display").innerText = `${xp}/${requiredXP}`;
+      document.getElementById("streak-display").innerText = calculate2026Streak();
+
+      const activeObj = new Date(activeDateStr + "T00:00:00");
+      document.getElementById("active-date-display").innerText = activeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      const todayPill = document.getElementById("today-indicator-pill");
+      const nextBtn = document.getElementById("next-day-btn");
+      const addWaterBtn = document.getElementById("add-water-btn");
+      const addStepsBtn = document.getElementById("add-steps-btn");
+
+      if (activeDateStr >= realTodayStr) {
+        todayPill.classList.remove("hidden");
+        todayPill.innerText = "Today";
+        nextBtn.disabled = true;
+      } else {
+        todayPill.classList.add("hidden");
+        nextBtn.disabled = false;
+      }
+
+      const isFuture = (activeDateStr > realTodayStr);
+      addWaterBtn.disabled = isFuture;
+      addStepsBtn.disabled = isFuture;
+
+      document.getElementById("water-current-val").innerText = log.water;
+      document.getElementById("water-goal-display").innerText = waterGoal;
+      document.getElementById("water-bar").style.width = `${Math.min(100, (log.water / waterGoal) * 100)}%`;
+
+      document.getElementById("steps-current-val").innerText = log.steps.toLocaleString();
+      document.getElementById("steps-goal-display").innerText = stepGoal.toLocaleString();
+      document.getElementById("steps-bar").style.width = `${Math.min(100, (log.steps / stepGoal) * 100)}%`;
+
+      const km = (log.steps * 0.00076).toFixed(2);
+      const calories = Math.round(log.steps * 0.045 * (currentWeight / 68));
+      document.getElementById("steps-km-display").innerText = `${km} km`;
+      document.getElementById("steps-cal-display").innerText = `${calories} kcal`;
+
+      document.getElementById("current-weight-display").innerText = currentWeight.toFixed(1);
+      document.getElementById("ideal-weight-display").innerText = idealWeight.toFixed(1);
+      const diff = Math.abs(currentWeight - idealWeight).toFixed(1);
+      document.getElementById("weight-remaining-label").innerText = `${diff} kg to ideal goal`;
+
+      renderTodoList();
+      saveLogs();
+    }
+
+    // ================= TO-DO & HABITS =================
+    function renderTodoList() {
+      const container = document.getElementById("todo-list-container");
+      container.innerHTML = "";
+      const log = getLog(activeDateStr);
+      const isFuture = (activeDateStr > realTodayStr);
+
+      const completedCount = log.completedTasks.length;
+      document.getElementById("quest-count-display").innerText = `${completedCount} / ${customTasks.length} Completed`;
+
+      if (customTasks.length === 0) {
+        container.innerHTML = `<div class="text-xs text-pink-200/60 py-6 text-center">No quests added. Tap "+ Add Task" to create your first habit!</div>`;
+        return;
+      }
+
+      customTasks.forEach(task => {
+        const isDone = log.completedTasks.includes(task.id);
+        const item = document.createElement("div");
+        item.className = `flex items-center justify-between p-3 rounded-2xl border transition-all ${
+          isDone ? 'bg-emerald-500/15 border-emerald-400/30 line-through opacity-75' : 'bg-white/5 border-white/10 hover:bg-white/10'
+        }`;
+
+        item.innerHTML = `
+          <div class="flex items-center gap-3 flex-1 min-w-0 pr-2">
+            <button onclick="toggleTaskCompletion('${task.id}', ${task.xp})" ${isFuture ? 'disabled' : ''} class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+              isDone ? 'bg-emerald-400 text-slate-950' : 'border border-pink-300 hover:border-pink-200'
+            } ${isFuture ? 'opacity-40 cursor-not-allowed' : 'active:scale-90'}">
+              ${isDone ? '<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
+            </button>
+            <span class="text-sm font-semibold text-white truncate ${isDone ? 'text-emerald-200' : ''}">${task.title}</span>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-[10px] font-extrabold ${isDone ? 'text-emerald-400' : 'text-amber-300'} bg-white/5 px-2.5 py-1 rounded-md">
+              +${task.xp} XP
+            </span>
+            <button onclick="deleteCustomTask('${task.id}')" title="Delete Task" class="text-rose-400 hover:text-rose-300 p-1.5 active:scale-90 transition-transform">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function toggleTaskCompletion(taskId, taskXP) {
+      if (activeDateStr > realTodayStr) return;
+      const log = getLog(activeDateStr);
+      const index = log.completedTasks.indexOf(taskId);
+
+      if (index === -1) {
+        log.completedTasks.push(taskId);
+        addXP(taskXP);
+        streamSubtitles(`Quest Completed! +${taskXP} XP earned.`);
+      } else {
+        log.completedTasks.splice(index, 1);
+        xp = Math.max(0, xp - taskXP);
+        streamSubtitles(`Task unchecked.`);
+      }
+      updateUI();
+    }
+
+    function toggleAddTaskModal() {
+      document.getElementById("add-task-modal").classList.toggle("hidden");
+    }
+
+    function saveNewTask() {
+      const input = document.getElementById("input-task-name");
+      const xpSelect = document.getElementById("input-task-xp");
+      const name = input.value.trim();
+      const xpVal = parseInt(xpSelect.value) || 25;
+
+      if (!name) return;
+
+      customTasks.push({ id: 'task_' + Date.now(), title: name, xp: xpVal });
+      input.value = "";
+      toggleAddTaskModal();
+      updateUI();
+      streamSubtitles(`Created quest: "${name}"!`);
+    }
+
+    function deleteCustomTask(taskId) {
+      if (confirm("Remove this quest from your list?")) {
+        customTasks = customTasks.filter(t => t.id !== taskId);
+        updateUI();
+      }
+    }
+
+    // ================= CONFETTI & LEVEL-UP =================
+    let confettiAnimationId;
+    function triggerConfetti() {
+      const canvas = document.getElementById("confetti-canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+
+      const particles = [];
+      const colors = ['#F59E0B', '#EC4899', '#8B5CF6', '#10B981', '#38BDF8', '#F43F5E'];
+
+      for (let i = 0; i < 75; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          w: Math.random() * 8 + 4,
+          h: Math.random() * 6 + 3,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 12,
+          vy: (Math.random() - 0.8) * 14,
+          rot: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 8,
+          gravity: 0.28
+        });
+      }
+
+      function update() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let activeParticles = 0;
+
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.gravity;
+          p.rot += p.rotSpeed;
+
+          if (p.y < canvas.height + 20) {
+            activeParticles++;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate((p.rot * Math.PI) / 180);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+            ctx.restore();
+          }
+        });
+
+        if (activeParticles > 0) confettiAnimationId = requestAnimationFrame(update);
+      }
+      cancelAnimationFrame(confettiAnimationId);
+      update();
+    }
+
+    function addXP(amount) {
+      xp += amount;
+      let requiredXP = getRequiredXP(level);
+      while (xp >= requiredXP && level < 30) {
+        xp -= requiredXP;
+        level += 1;
+        requiredXP = getRequiredXP(level);
+        showLevelUpModal(level);
+      }
+      updateUI();
+    }
+
+    function showLevelUpModal(newLevel) {
+      const modal = document.getElementById("levelup-modal");
+      const badgeData = LEVEL_ROSTER[newLevel - 1] || LEVEL_ROSTER[LEVEL_ROSTER.length - 1];
+
+      document.getElementById("popup-new-level").innerText = newLevel;
+      document.getElementById("popup-badge-name").innerText = badgeData.name;
+      document.getElementById("popup-badge-desc").innerText = badgeData.reward;
+      modal.classList.remove("hidden");
+
+      playLevelUpSound();
+      setTimeout(triggerConfetti, 80);
+    }
+
+    function closeLevelUpModal() {
+      document.getElementById("levelup-modal").classList.add("hidden");
+      cancelAnimationFrame(confettiAnimationId);
+    }
+
+    // ================= TIMELINE LOGGING =================
+    function changeActiveDay(offset) {
+      const current = new Date(activeDateStr + "T00:00:00");
+      current.setDate(current.getDate() + offset);
+      if (current.getFullYear() < 2026) return;
+      const targetKey = formatDateKey(current);
+      if (targetKey > realTodayStr) return;
+
+      activeDateStr = targetKey;
+      localStorage.setItem('hb_active_date', activeDateStr);
+      updateUI();
+      streamSubtitles(`Viewing timeline for ${activeDateStr}.`);
+    }
+
+    function jumpToRealToday() {
+      activeDateStr = realTodayStr;
+      localStorage.setItem('hb_active_date', activeDateStr);
+      updateUI();
+    }
+
+    function addWaterForActiveDay(amount) {
+      if (activeDateStr > realTodayStr) return;
+      const log = getLog(activeDateStr);
+      log.water += amount;
+      addXP(20);
+      updateUI();
+      streamSubtitles(`+${amount}ml water logged for ${activeDateStr}!`);
+    }
+
+    function addStepsForActiveDay(amount) {
+      if (activeDateStr > realTodayStr) return;
+      const log = getLog(activeDateStr);
+      log.steps += amount;
+      addXP(30);
+      updateUI();
+      streamSubtitles(`+${amount} steps logged for ${activeDateStr}!`);
+    }
+
+    // Achievements Vault
+    let currentFilter = 'all';
+    function toggleRewardsModal() {
+      const modal = document.getElementById("rewards-modal");
+      modal.classList.toggle("hidden");
+      if (!modal.classList.contains("hidden")) renderAchievements();
+    }
+
+    function filterAchievements(filter) {
+      currentFilter = filter;
+      document.getElementById("tab-all").className = filter === 'all' ? 'px-2.5 py-1 rounded-lg bg-pink-500/30 text-white border border-pink-400/30' : 'px-2.5 py-1 rounded-lg fuji-glass-subtle text-pink-200';
+      document.getElementById("tab-done").className = filter === 'done' ? 'px-2.5 py-1 rounded-lg bg-pink-500/30 text-white border border-pink-400/30' : 'px-2.5 py-1 rounded-lg fuji-glass-subtle text-pink-200';
+      document.getElementById("tab-left").className = filter === 'left' ? 'px-2.5 py-1 rounded-lg bg-pink-500/30 text-white border border-pink-400/30' : 'px-2.5 py-1 rounded-lg fuji-glass-subtle text-pink-200';
+      renderAchievements();
+    }
+
+    function renderAchievements() {
+      const container = document.getElementById("achievements-list");
+      container.innerHTML = "";
+      LEVEL_ROSTER.forEach(item => {
+        const isDone = level >= item.lvl;
+        if (currentFilter === 'done' && !isDone) return;
+        if (currentFilter === 'left' && isDone) return;
+        const card = document.createElement("div");
+        card.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all ${
+          isDone ? 'bg-pink-500/15 border-pink-400/40 shadow-sm' : 'bg-white/5 border-white/5 opacity-60'
+        }`;
+        card.innerHTML = `
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${isDone ? 'bg-gradient-to-tr from-pink-400 to-indigo-500 text-white shadow' : 'bg-white/10 text-white/40'}">${item.lvl}</div>
+            <div>
+              <div class="font-bold ${isDone ? 'text-white' : 'text-white/70'}">${item.name}</div>
+              <div class="text-[9px] ${isDone ? 'text-pink-300' : 'text-white/40'}">${item.reward}</div>
+            </div>
+          </div>
+          <div>${isDone ? '<span class="text-[9px] font-extrabold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md">DONE</span>' : `<span class="text-[9px] font-extrabold text-amber-300/80 bg-white/5 px-2 py-0.5 rounded-md">Lvl ${item.lvl}</span>`}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // 2026 Calendar
+    function toggleCalendarModal() {
+      const modal = document.getElementById("calendar-modal");
+      modal.classList.toggle("hidden");
+      if (!modal.classList.contains("hidden")) renderCalendar();
+    }
+
+    function changeCalendarMonth(offset) {
+      calendarMonthDate.setMonth(calendarMonthDate.getMonth() + offset);
+      if (calendarMonthDate.getFullYear() < 2026) calendarMonthDate.setFullYear(2026, 0, 1);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      document.getElementById("calendar-month-label").innerText = `${monthNames[calendarMonthDate.getMonth()]} ${calendarMonthDate.getFullYear()}`;
+      const grid = document.getElementById("calendar-grid");
+      grid.innerHTML = "";
+
+      const year = calendarMonthDate.getFullYear();
+      const month = calendarMonthDate.getMonth();
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < firstDayIndex; i++) grid.appendChild(document.createElement("div"));
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const log = timelineLogs[dayStr];
+        const goalHit = log && (log.water >= waterGoal || log.steps >= stepGoal);
+        const isSelected = (dayStr === activeDateStr);
+        const isToday = (dayStr === realTodayStr);
+        const isFuture = (dayStr > realTodayStr);
+
+        const btn = document.createElement("button");
+        btn.innerText = d;
+        btn.className = `h-8 w-8 mx-auto rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+          isFuture ? 'opacity-20 cursor-not-allowed text-white/30' : isSelected ? 'border-2 border-pink-400 bg-white/20 scale-105' : 'hover:bg-white/10'
+        } ${goalHit ? 'bg-pink-500/40 text-pink-100 shadow-md shadow-pink-500/30' : 'text-white/80'} ${isToday ? 'ring-1 ring-amber-300' : ''}`;
+
+        if (!isFuture) {
+          btn.onclick = function() {
+            activeDateStr = dayStr;
+            localStorage.setItem('hb_active_date', activeDateStr);
+            updateUI();
+            toggleCalendarModal();
+          };
+        } else {
+          btn.disabled = true;
+        }
+        grid.appendChild(btn);
+      }
+    }
+
+    // Step Sensor
+    function toggleStepSensor() {
+      if (isSensorActive) {
+        window.removeEventListener('devicemotion', handleMotion);
+        isSensorActive = false;
+        localStorage.setItem('hb_sensor_active', 'false');
+        updateSensorButtonUI(false);
+        streamSubtitles("Step sensor paused.");
+      } else {
+        initSensor();
+      }
+    }
+
+    function initSensor() {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission().then(res => {
+          if (res === 'granted') startMotion();
+          else updateSensorButtonUI(false);
+        }).catch(() => updateSensorButtonUI(false));
+      } else {
+        startMotion();
+      }
+    }
+
+    function startMotion() {
+      window.addEventListener('devicemotion', handleMotion, false);
+      isSensorActive = true;
+      localStorage.setItem('hb_sensor_active', 'true');
+      updateSensorButtonUI(true);
+      streamSubtitles("Step sensor active.");
+    }
+
+    function updateSensorButtonUI(active) {
+      const dot = document.getElementById("sensor-dot");
+      const label = document.getElementById("sensor-btn-label");
+      if (active) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 pulse-dot";
+        label.innerText = "Sensor: ON";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-gray-400";
+        label.innerText = "Sensor: OFF";
+      }
+    }
+
+    function handleMotion(event) {
+      const acc = event.accelerationIncludingGravity;
+      if (!acc || acc.x === null) return;
+      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const now = Date.now();
+
+      if (mag > STEP_THRESHOLD && lastAccMagnitude <= STEP_THRESHOLD) {
+        if (now - lastStepTime > STEP_COOLDOWN) {
+          lastStepTime = now;
+          const todayLog = getLog(realTodayStr);
+          todayLog.steps += 1;
+          
+          // Live sync to pocket display if active
+          const pocketEl = document.getElementById('pocket-steps-display');
+          if (pocketEl) pocketEl.innerText = todayLog.steps.toLocaleString();
+
+          if (todayLog.steps % 10 === 0) addXP(3);
+          updateUI();
+        }
+      }
+      lastAccMagnitude = mag;
+    }
+
+    // Modals
+    function toggleGoalsModal() { document.getElementById("goals-modal").classList.toggle("hidden"); }
+    function toggleThemeDrawer() { document.getElementById("theme-drawer").classList.toggle("hidden"); }
+
+    function saveCustomGoals() {
+      const newWater = parseInt(document.getElementById("input-water-goal").value);
+      const newSteps = parseInt(document.getElementById("input-step-goal").value);
+      const newCurrWeight = parseFloat(document.getElementById("input-current-weight").value);
+      const newIdealWeight = parseFloat(document.getElementById("input-ideal-weight").value);
+
+      if (newWater > 0) waterGoal = newWater;
+      if (newSteps > 0) stepGoal = newSteps;
+      if (newCurrWeight > 0) currentWeight = newCurrWeight;
+      if (newIdealWeight > 0) idealWeight = newIdealWeight;
+
+      updateUI();
+      toggleGoalsModal();
+      streamSubtitles("Custom goals saved!");
+    }
+
+    function editWaterGoal() {
+      const g = prompt("Daily Water Goal (ml):", waterGoal);
+      if (g && parseInt(g) > 0) { waterGoal = parseInt(g); updateUI(); }
+    }
+
+    function editStepGoal() {
+      const g = prompt("Daily Steps Goal:", stepGoal);
+      if (g && parseInt(g) > 0) { stepGoal = parseInt(g); updateUI(); }
+    }
+
+    function promptUpdateWeight() {
+      const newCurrent = prompt("Enter Current Weight (kg):", currentWeight);
+      if (newCurrent && !isNaN(parseFloat(newCurrent))) {
+        currentWeight = parseFloat(newCurrent);
+        addXP(30);
+        updateUI();
+      }
+    }
+
+    function streamSubtitles(text) {
+      const el = document.getElementById("subtitles");
+      el.innerText = text;
+      el.classList.add("animate-pulse");
+      setTimeout(() => el.classList.remove("animate-pulse"), 450);
+    }
+
+    function setTheme(name) {
+      const themes = {
+        fuji: "https://images.unsplash.com/photo-1570459027562-4a916cc6113f?q=80&w=1200&auto=format&fit=crop",
+        alpine: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1200&auto=format&fit=crop",
+        golden: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1200&auto=format&fit=crop",
+        aurora: "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?q=80&w=1200&auto=format&fit=crop"
+      };
+      document.getElementById("scenic-bg").style.backgroundImage = `url('${themes[name]}')`;
+      toggleThemeDrawer();
+    }
+
+    function loadCustomWallpaper(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById("scenic-bg").style.backgroundImage = `url('${e.target.result}')`;
+          localStorage.setItem('hb_custom_bg', e.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  </script>
+</body>
+</html>
